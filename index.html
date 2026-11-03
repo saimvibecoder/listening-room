@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="description" content="A 3D shelf of CDs, cassettes and records. Scroll, spin and play your own music with its cover art.">
-<meta name="theme-color" content="#ebebe8">
+<meta name="theme-color" content="#ffffff">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23151514'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23ebebe8'/%3E%3C/svg%3E">
 <title>Halftone Listening Room</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -15,8 +15,8 @@
 /* Single light look by design (a lit studio counter), same in every theme.
    Layout: full-bleed WebGL shelf on a dot-grid counter; HUD pinned to corners (title top-left, counter top-right, dock bottom). 4px grid. */
 :root{
-  --bg:#ebebe8; --dot:#c8c8c2; --ink:#151514; --ink-2:#4a4a46; --muted:#77776f; --line:rgba(20,20,18,.09);
-  --surface:#f6f6f3; --pill:#151514; --pill-ink:#f4f4f1; --accent:#d2342b; --lcd:#0f110f;
+  --bg:#ffffff; --dot:transparent; --ink:#151514; --ink-2:#4a4a46; --muted:#77776f; --line:rgba(20,20,18,.09);
+  --surface:#fbfbfa; --pill:#151514; --pill-ink:#f4f4f1; --accent:#d2342b; --lcd:#0f110f;
   --r-ctl:10px; --r-panel:14px; color-scheme:light;
   --ease:cubic-bezier(.2,.7,.2,1);
   --f-pix:"Archivo","Arial Narrow",system-ui,sans-serif;
@@ -26,7 +26,7 @@
 [hidden]{display:none!important}
 html,body{height:100%}
 body{margin:0;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--f-body);
-  background-image:radial-gradient(var(--dot) 1.1px,transparent 1.4px);background-size:16px 16px;
+  transition:background-color .5s var(--ease);
   -webkit-font-smoothing:antialiased;touch-action:none;user-select:none;-webkit-user-select:none}
 #gl{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:grab}
 #gl.grabbing{cursor:grabbing}
@@ -49,6 +49,13 @@ h1.pix{margin:0;font-family:var(--f-pix);font-weight:700;font-size:clamp(36px,5.
 .counter{position:absolute;right:max(24px,env(safe-area-inset-right,0px));top:calc(24px + env(safe-area-inset-top,0px));text-align:right;display:grid;gap:4px}
 .counter b{font-family:var(--f-pix);font-weight:700;font-size:clamp(32px,3.6vw,48px);line-height:1;font-variant-numeric:tabular-nums}
 .counter span{color:var(--muted)}
+.finish{display:flex;gap:4px;justify-self:end;margin-top:8px;border-radius:var(--r-ctl);padding:4px}
+.finish button{appearance:none;border:0;cursor:pointer;background:transparent;color:var(--muted);border-radius:6px;padding:4px 10px;font:inherit;letter-spacing:inherit;transition:background-color .15s var(--ease),color .15s var(--ease)}
+.finish button:hover{color:var(--ink)}
+.finish button.on{background:var(--pill);color:var(--pill-ink)}
+.finish button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* paper: warm white with a fine fibre grain */
+body.finish-paper{--bg:#f7f3ec;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .45 0 0 0 0 .4 0 0 0 0 .32 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
 
 .dock{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center;transition:opacity .45s var(--ease),transform .45s var(--ease);width:max-content;max-width:calc(100vw - 32px)}
 .bar4{display:flex;align-items:center;gap:4px;border-radius:calc(var(--r-ctl) + 4px);padding:4px}
@@ -103,7 +110,7 @@ body.playing-mode .tracks{opacity:1;transform:translate(0,-50%);pointer-events:a
 body.playing-mode .now{opacity:1;transform:translate(-50%,0);pointer-events:auto}
 
 /* loader */
-.loader{position:fixed;inset:0;z-index:20;background:var(--bg);background-image:radial-gradient(var(--dot) 1.1px,transparent 1.4px);background-size:16px 16px;display:grid;place-items:center;transition:opacity .7s .1s var(--ease),visibility .7s .1s}
+.loader{position:fixed;inset:0;z-index:20;background:var(--bg);display:grid;place-items:center;transition:opacity .7s .1s var(--ease),visibility .7s .1s}
 .loader.done{opacity:0;visibility:hidden}
 .ld{display:grid;gap:12px;justify-items:center}
 .ld b{font-family:var(--f-pix);font-weight:700;font-size:clamp(64px,12vw,140px);line-height:.9;font-variant-numeric:tabular-nums}
@@ -143,6 +150,8 @@ h1.pix{line-height:.94}
   .hint{display:none}
   .info{max-width:calc(100vw - 120px);gap:12px}
   .counter .sfx{display:none}
+  /* on phones the picker shows only the current finish; tap it to cycle */
+  .finish button:not(.on){display:none}
   .pips{gap:2px;padding:0 2px}
   .pip{min-width:24px;padding:0 2px}
   .ib{width:28px}
@@ -176,7 +185,10 @@ h1.pix{line-height:.94}
     </div>
   </section>
 
-  <div class="counter"><b id="count">01</b><span class="mono" id="countOf">of 09 · the shelf</span></div>
+  <div class="counter"><b id="count">01</b><span class="mono" id="countOf">of 09 · the shelf</span>
+    <div class="finish panel mono" role="group" aria-label="Surface finish">
+      <button data-f="matte">Matte</button><button data-f="satin">Satin</button><button data-f="gloss">Gloss</button><button data-f="paper">Paper</button>
+    </div></div>
 
   <nav class="dock" aria-label="Shelf navigation">
     <div class="bar4 panel mono">
@@ -232,6 +244,7 @@ h1.pix{line-height:.94}
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { Reflector } from 'three/addons/objects/Reflector.js';
 
 /* ---------------- data ---------------- */
 const DEMO = [
@@ -387,7 +400,41 @@ Object.assign(sun.shadow.camera,{left:-9,right:9,top:6,bottom:-6,near:1,far:20})
 scene.add(sun);
 const fill=new THREE.DirectionalLight(0xfff6ee,0.35); fill.position.set(-5,2,4); scene.add(fill);
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(60,30),new THREE.ShadowMaterial({opacity:.13}));
-ground.rotation.x=-Math.PI/2; ground.position.y=-1.55; ground.receiveShadow=true; scene.add(ground);
+ground.rotation.x=-Math.PI/2; ground.position.y=-1.55; ground.receiveShadow=true; ground.renderOrder=1; scene.add(ground);
+// gloss and satin: a mirror floor whose reflection fades out toward the edges and back
+const FloorShader={ name:'FloorReflector',
+  uniforms:{color:{value:null},tDiffuse:{value:null},textureMatrix:{value:null},strength:{value:0},camZ:{value:9}},
+  vertexShader:`uniform mat4 textureMatrix; varying vec4 vUv; varying vec2 vPlane;
+    void main(){ vUv=textureMatrix*vec4(position,1.0); vPlane=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+  fragmentShader:`uniform sampler2D tDiffuse; uniform float strength; uniform float camZ; varying vec4 vUv; varying vec2 vPlane;
+    void main(){ vec4 base=texture2DProj(tDiffuse,vUv);
+      // strongest right under an object, fading as the reflection travels toward the viewer, like a real polished floor
+      float wz=(0.5-vPlane.y)*14.0, t=wz/camZ;
+      float f=(1.0-smoothstep(0.12,0.5,t))*smoothstep(-1.2,0.0,wz)*(1.0-smoothstep(0.26,0.42,abs(vPlane.x-0.5)));
+      gl_FragColor=vec4(base.rgb, base.a*strength*f);
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+    }`};
+const mirror=new Reflector(new THREE.PlaneGeometry(30,14),{shader:FloorShader,clipBias:0.003,textureWidth:Math.round(innerWidth*Math.min(devicePixelRatio,2)*0.5),textureHeight:Math.round(innerHeight*Math.min(devicePixelRatio,2)*0.5)});
+mirror.material.transparent=true; mirror.material.depthWrite=false;
+mirror.rotation.x=-Math.PI/2; mirror.position.y=-1.552; mirror.visible=false; scene.add(mirror);
+const FINISHES={matte:{reflect:0,shadow:.13},satin:{reflect:.24,shadow:.11},gloss:{reflect:.5,shadow:.08},paper:{reflect:0,shadow:.15}};
+let finish='matte';
+function setFinish(f){
+  if(!FINISHES[f]) f='matte'; finish=f;
+  document.body.classList.toggle('finish-paper',f==='paper');
+  mirror.visible=FINISHES[f].reflect>0; mirror.material.uniforms.strength.value=FINISHES[f].reflect;
+  document.querySelectorAll('.finish button').forEach(b=>b.classList.toggle('on',b.dataset.f===f));
+  try{ localStorage.setItem('halftone-finish',f); }catch(e){}
+}
+document.querySelectorAll('.finish button').forEach(b=>b.onclick=()=>{
+  const keys=Object.keys(FINISHES);
+  // phones show one button, so tapping the current finish moves to the next one
+  if(b.dataset.f===finish && matchMedia('(max-width:760px)').matches) setFinish(keys[(keys.indexOf(finish)+1)%keys.length]);
+  else setFinish(b.dataset.f);
+});
+let savedFinish='matte'; try{ savedFinish=localStorage.getItem('halftone-finish')||'matte'; }catch(e){}
+setFinish(savedFinish);
 
 const shadowAll=o=>o.traverse(m=>{ if(m.isMesh){ m.castShadow=true; } });
 
@@ -675,6 +722,7 @@ document.querySelectorAll('[data-i]').forEach(el=>{ el.outerHTML=icon(el.dataset
 $('pPlay').innerHTML=icon('pause'); $('pMute').innerHTML=icon('vol');
 
 function resize(){
+  if(typeof mirror!=='undefined'){ const d=Math.min(devicePixelRatio,2)*0.5; mirror.getRenderTarget().setSize(Math.round(innerWidth*d),Math.round(innerHeight*d)); }
   const w=innerWidth,h=innerHeight; renderer.setSize(w,h,false); camera.aspect=w/h;
   camera.updateProjectionMatrix();
   wide = w>760; stageX = wide ? -0.9 : 0;
@@ -978,7 +1026,13 @@ function tick(){
   turntable.root.updateMatrixWorld();
   player.phones.visible=wide; turntable.phones.visible=wide;
   // floor shadows fade out behind the cover wall so it stays clean
-  ground.material.opacity += (((mode==='collage'&&N>12)?0:0.13)-ground.material.opacity)*Math.min(1,dt*4);
+  const wall=(mode==='collage'&&N>12);
+  ground.material.opacity += ((wall?0:FINISHES[finish].shadow)-ground.material.opacity)*Math.min(1,dt*4);
+  // the floor sits just under the shelf, and drops lower when a player rises for playback
+  const floorY = mode==='shelf' ? -1.08 : -1.55;
+  ground.position.y += (floorY-ground.position.y)*Math.min(1,dt*3); mirror.position.y=ground.position.y-0.002;
+  mirror.material.uniforms.camZ.value=camera.position.z;
+  mirror.material.uniforms.strength.value += ((wall?0:FINISHES[finish].reflect)-mirror.material.uniforms.strength.value)*Math.min(1,dt*4);
   const prog = ttShown ? Math.min(1, elapsed/(trackLen()||1)) : 0;
   const armT = (ttShown && playing) ? -0.40 - 0.12*prog : 0;
   turntable.arm.rotation.z += (armT-turntable.arm.rotation.z)*Math.min(1,dt*2.2);
