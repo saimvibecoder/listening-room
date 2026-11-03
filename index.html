@@ -95,6 +95,8 @@ h1.pix{margin:0;font-family:var(--f-pix);font-weight:700;font-size:clamp(36px,5.
 .time{font:500 11px var(--f-mono);color:var(--muted);font-variant-numeric:tabular-nums;min-width:32px;text-align:right}
 
 body.playing-mode .info,body.playing-mode .counter{opacity:0;transform:translateY(-8px);pointer-events:none}
+body.collage-mode .info{opacity:0;transform:translateY(-8px);pointer-events:none}
+.ib.on,.ib.on:hover{background:var(--pill);color:var(--pill-ink)}
 body.playing-mode .dock{opacity:0;transform:translate(-50%,16px);pointer-events:none}
 body.playing-mode .back{opacity:1;transform:none;pointer-events:auto}
 body.playing-mode .tracks{opacity:1;transform:translate(0,-50%);pointer-events:auto}
@@ -183,6 +185,7 @@ h1.pix{line-height:.94}
       <button id="clearBtn" hidden>Reset</button>
     </div>
     <div class="bar4 panel">
+      <button class="ib" id="pileBtn" aria-label="Collection view" aria-pressed="false"><span data-i="pile"></span></button>
       <button class="ib" id="prev" aria-label="Previous album"><span data-i="left"></span></button>
       <div class="pips" id="pips"></div>
       <button class="ib" id="next" aria-label="Next album"><span data-i="right"></span></button>
@@ -382,6 +385,7 @@ const sun=new THREE.DirectionalLight(0xffffff,1.6); sun.position.set(2.5,6,5); s
 sun.shadow.mapSize.set(2048,2048); sun.shadow.radius=8; sun.shadow.blurSamples=16;
 Object.assign(sun.shadow.camera,{left:-9,right:9,top:6,bottom:-6,near:1,far:20}); sun.shadow.bias=-0.0004;
 scene.add(sun);
+const fill=new THREE.DirectionalLight(0xfff6ee,0.35); fill.position.set(-5,2,4); scene.add(fill);
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(60,30),new THREE.ShadowMaterial({opacity:.13}));
 ground.rotation.x=-Math.PI/2; ground.position.y=-1.55; ground.receiveShadow=true; scene.add(ground);
 
@@ -397,27 +401,44 @@ function buildCD(a,art){
   const f=new THREE.Mesh(new THREE.RingGeometry(0.075,R,128,1),face); f.position.z=0.012;
   const b=new THREE.Mesh(new THREE.RingGeometry(0.075,R,128,1),back); b.rotation.y=Math.PI; b.position.z=-0.012;
   const e=new THREE.Mesh(new THREE.CylinderGeometry(R,R,0.024,128,1,true),edge); e.rotation.x=Math.PI/2;
+  // invisible disc over the centre hole so a click there still counts
+  const hole=new THREE.Mesh(new THREE.CircleGeometry(0.08,16),new THREE.MeshBasicMaterial()); hole.visible=false; g.add(hole);
   g.add(f,b,e); shadowAll(g); return {root:g, spinAxis:'z', spinObj:g};
+}
+function tapeBand(a,art){
+  const W=1024,H=180,c=document.createElement('canvas'); c.width=W; c.height=H; const x=c.getContext('2d');
+  x.fillStyle='#f6f2e8'; x.fillRect(0,0,W,H);
+  x.drawImage(art,0,0,art.width,art.height,0,0,H,H);
+  x.fillStyle='#151514'; let fs=64; x.font=`600 ${fs}px Caveat`; while(x.measureText(a.title).width>W-H-150 && fs>30){ fs-=4; x.font=`600 ${fs}px Caveat`; }
+  x.fillText(a.title,H+28,92,W-H-150);
+  x.fillStyle='#7c7c76'; x.font='500 22px "JetBrains Mono"'; x.fillText([a.artist.toUpperCase(),a.year].filter(Boolean).join(' · '),H+30,140,W-H-150);
+  x.fillStyle='#151514'; x.font='700 54px "JetBrains Mono"'; x.fillText('A',W-72,112);
+  return c;
 }
 function buildTape(a,art){
   const g=new THREE.Group();
-  const shellHex=a.shell||'#2a2a2c';
-  const shell=new THREE.MeshPhysicalMaterial({color:new THREE.Color(shellHex),roughness:.42,clearcoat:.6,clearcoatRoughness:.3});
-  const body=new THREE.Mesh(new RoundedBoxGeometry(1.72,1.08,0.17,4,0.05),shell); g.add(body);
-  const lab=new THREE.Mesh(new THREE.PlaneGeometry(1.5,0.615),new THREE.MeshStandardMaterial({map:tex(tapeLabel(a,art)),roughness:.75}));
-  lab.position.set(0,0.12,0.0865); g.add(lab);
-  const reelM=new THREE.MeshStandardMaterial({map:tex(reelTex()),roughness:.5,transparent:true});
-  const spoolM=new THREE.MeshStandardMaterial({color:0x3b2416,roughness:.6});
-  const reels=[];
-  [[-0.36,0.135],[0.36,0.095]].forEach(([px,sr])=>{
-    const sp=new THREE.Mesh(new THREE.CircleGeometry(sr,48),spoolM); sp.position.set(px,0.052,0.0872); g.add(sp);
-    const rl=new THREE.Mesh(new THREE.CircleGeometry(0.075,32),reelM); rl.position.set(px,0.052,0.0878); g.add(rl); reels.push(rl);
+  const tint=new THREE.Color(a.shell||'#2a2a2c');
+  // see-through shell: you can look in at the tape packs, hubs and tape path
+  const clear=new THREE.MeshPhysicalMaterial({color:tint.clone().lerp(new THREE.Color('#ffffff'),.45),roughness:.06,clearcoat:1,clearcoatRoughness:.04,transparent:true,opacity:.34,depthWrite:false,side:THREE.DoubleSide});
+  const body=new THREE.Mesh(new RoundedBoxGeometry(1.72,1.08,0.17,4,0.05),clear); body.renderOrder=2; g.add(body);
+  const lab=new THREE.Mesh(new THREE.PlaneGeometry(1.5,0.264),new THREE.MeshStandardMaterial({map:tex(tapeBand(a,art)),roughness:.75}));
+  lab.position.set(0,0.33,0.0865); g.add(lab);
+  const packM=new THREE.MeshStandardMaterial({color:0x3b2416,roughness:.35,metalness:.25,side:THREE.DoubleSide});
+  const hubM=new THREE.MeshStandardMaterial({map:tex(reelTex()),roughness:.5,transparent:true});
+  const reels=[], packs=[];
+  [-0.36,0.36].forEach((px,k)=>{
+    const pk=new THREE.Mesh(new THREE.CircleGeometry(0.29,64),packM); pk.position.set(px,-0.02,0); pk.scale.setScalar(k?0.6:1); g.add(pk); packs.push(pk);
+    const hub=new THREE.Mesh(new THREE.CircleGeometry(0.085,32),hubM); hub.position.set(px,-0.02,0.045); g.add(hub); reels.push(hub);
   });
-  const trap=new THREE.Mesh(new RoundedBoxGeometry(0.98,0.2,0.05,2,0.02),new THREE.MeshStandardMaterial({color:new THREE.Color(shellHex).multiplyScalar(.82),roughness:.5}));
+  const tapeM=new THREE.MeshStandardMaterial({color:0x2a1a10,roughness:.4});
+  const path=new THREE.Mesh(new THREE.BoxGeometry(1.24,0.012,0.03),tapeM); path.position.set(0,-0.36,0); g.add(path);
+  const rollM=new THREE.MeshStandardMaterial({color:0xf2f0ea,roughness:.4});
+  [-0.62,0.62].forEach(rx=>{ const r=new THREE.Mesh(new THREE.CylinderGeometry(.04,.04,.1,20),rollM); r.rotation.x=Math.PI/2; r.position.set(rx,-0.34,0); g.add(r); });
+  const trap=new THREE.Mesh(new RoundedBoxGeometry(0.98,0.2,0.05,2,0.02),new THREE.MeshStandardMaterial({color:tint.clone().multiplyScalar(.82),roughness:.5}));
   trap.position.set(0,-0.42,0.08); g.add(trap);
   const screwM=new THREE.MeshStandardMaterial({color:0x9a9a9a,metalness:1,roughness:.3});
-  [[-.78,.46],[.78,.46],[-.78,-.46],[.78,-.46],[0,-.3]].forEach(([sx,sy])=>{ const s=new THREE.Mesh(new THREE.CylinderGeometry(.022,.022,.01,12),screwM); s.rotation.x=Math.PI/2; s.position.set(sx,sy,.087); g.add(s); });
-  shadowAll(g); return {root:g, spinAxis:'y', spinObj:g, reels};
+  [[-.78,.46],[.78,.46],[-.78,-.46],[.78,-.46],[0,.18]].forEach(([sx,sy])=>{ const sc=new THREE.Mesh(new THREE.CylinderGeometry(.022,.022,.01,12),screwM); sc.rotation.x=Math.PI/2; sc.position.set(sx,sy,.087); g.add(sc); });
+  shadowAll(g); return {root:g, spinAxis:'y', spinObj:g, reels, packs};
 }
 function buildVinyl(a,art){
   const g=new THREE.Group();
@@ -435,6 +456,61 @@ function buildVinyl(a,art){
   return {root:g, spinAxis:'z', spinObj:rec, sleeve, rec};
 }
 
+function buildHeadphones(){
+  const g=new THREE.Group();
+  const bandM=new THREE.MeshStandardMaterial({color:0x2b2b2d,roughness:.55});
+  const shellM=new THREE.MeshPhysicalMaterial({color:0xe4e1da,roughness:.4,clearcoat:.5,clearcoatRoughness:.3});
+  const padM=new THREE.MeshStandardMaterial({color:0x232325,roughness:.9});
+  const capM=new THREE.MeshStandardMaterial({color:0xd2342b,roughness:.5});
+  const arc=new THREE.Mesh(new THREE.TorusGeometry(0.5,0.035,12,64,Math.PI),bandM); arc.position.y=0.1; g.add(arc);
+  [-1,1].forEach(sd=>{ const cup=new THREE.Group(); cup.position.set(0.5*sd,-0.12,0);
+    const yoke=new THREE.Mesh(new THREE.BoxGeometry(0.04,0.26,0.05),bandM); yoke.position.y=0.13;
+    const sh=new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,0.13,40),shellM); sh.rotation.z=Math.PI/2;
+    const cap=new THREE.Mesh(new THREE.CircleGeometry(0.11,32),capM); cap.rotation.y=sd*Math.PI/2; cap.position.x=sd*0.067;
+    const pad=new THREE.Mesh(new THREE.TorusGeometry(0.15,0.055,12,40),padM); pad.rotation.y=Math.PI/2; pad.position.x=-sd*0.08;
+    cup.add(yoke,sh,cap,pad); g.add(cup); });
+  return g;
+}
+// headphones sit beside a device with a cable running to its jack (device-local coordinates)
+function addHeadphones(dev, jackX){
+  const hp=buildHeadphones(); hp.position.set(-1.95,0.55,0.15); hp.rotation.set(0.1,0.55,0.15); hp.scale.setScalar(0.95);
+  const curve=new THREE.CatmullRomCurve3([new THREE.Vector3(-2.33,0.2,0.36),new THREE.Vector3(-2.48,-0.6,0.45),new THREE.Vector3(-2.05,-1.38,0.5),new THREE.Vector3(-1.45,-1.46,0.3),new THREE.Vector3(jackX,-1.08,0.02)]);
+  const cable=new THREE.Mesh(new THREE.TubeGeometry(curve,80,0.013,8),new THREE.MeshStandardMaterial({color:0x2b2b2d,roughness:.6}));
+  const set=new THREE.Group(); set.add(hp,cable); shadowAll(set); dev.add(set); return set;
+}
+const TT_PX=-0.18, TT_PY=0.18;
+function buildTurntable(){
+  const g=new THREE.Group();
+  const plinthM=new THREE.MeshPhysicalMaterial({color:0xe9e7e2,roughness:.55,clearcoat:.3,clearcoatRoughness:.4});
+  const alu=new THREE.MeshPhysicalMaterial({color:0xcfd2d6,metalness:.85,roughness:.28});
+  const dark=new THREE.MeshStandardMaterial({color:0x1d1d1f,roughness:.8});
+  g.add(new THREE.Mesh(new RoundedBoxGeometry(2.7,2.7,0.3,5,0.1),plinthM));
+  const platter=new THREE.Mesh(new THREE.CylinderGeometry(1.06,1.06,0.07,128),alu); platter.rotation.x=Math.PI/2; platter.position.set(TT_PX,TT_PY,0.185); g.add(platter);
+  const mat=new THREE.Mesh(new THREE.CircleGeometry(1.0,96),dark); mat.position.set(TT_PX,TT_PY,0.2205); g.add(mat);
+  const spin=new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.025,0.08,16),alu); spin.rotation.x=Math.PI/2; spin.position.set(TT_PX,TT_PY,0.25); g.add(spin);
+  // tonearm: pivots at the top right and swings onto the record
+  const base=new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.14,0.08,40),alu); base.rotation.x=Math.PI/2; base.position.set(1.02,1.0,0.19); g.add(base);
+  const arm=new THREE.Group(); arm.position.set(1.02,1.0,0.3);
+  const tube=new THREE.Mesh(new THREE.CylinderGeometry(0.018,0.018,1.42,12),alu); tube.position.y=-0.71;
+  const shell=new THREE.Mesh(new THREE.BoxGeometry(0.09,0.2,0.04),dark); shell.position.set(-0.02,-1.47,0); shell.rotation.z=0.3;
+  const cart=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.08,0.05),new THREE.MeshStandardMaterial({color:0xd2342b,roughness:.5})); cart.position.set(-0.05,-1.55,-0.02); cart.rotation.z=0.3;
+  const cw=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.16,24),dark); cw.position.y=0.2;
+  const hinge=new THREE.Mesh(new THREE.SphereGeometry(0.05,16,12),alu);
+  arm.add(tube,shell,cart,cw,hinge); g.add(arm);
+  const post=new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.1,12),dark); post.rotation.x=Math.PI/2; post.position.set(1.02,-0.45,0.2); g.add(post);
+  // controls
+  const start=new THREE.Mesh(new RoundedBoxGeometry(0.34,0.16,0.04,2,0.02),dark); start.position.set(-0.92,-1.05,0.16); g.add(start);
+  [-0.58,-0.4].forEach(bx=>{ const b=new THREE.Mesh(new THREE.CylinderGeometry(.06,.06,.04,24),alu); b.rotation.x=Math.PI/2; b.position.set(bx,-1.05,0.17); g.add(b); });
+  const led=new THREE.Mesh(new THREE.CircleGeometry(0.03,16),new THREE.MeshStandardMaterial({color:0x5a1512,emissive:0xff3b2f,emissiveIntensity:0})); led.position.set(-1.18,-1.05,0.152); g.add(led);
+  const track=new THREE.Mesh(new THREE.BoxGeometry(0.035,0.45,0.02),dark); track.position.set(1.2,-0.93,0.155); g.add(track);
+  const knob=new THREE.Mesh(new RoundedBoxGeometry(0.13,0.06,0.05,2,0.015),alu); knob.position.set(1.2,-0.9,0.17); g.add(knob);
+  const pc=document.createElement('canvas'); pc.width=512; pc.height=112; const px=pc.getContext('2d');
+  px.fillStyle='#2b2c2f'; px.font='700 60px Doto'; px.fillText('HX-T1',6,60);
+  px.font='500 17px "JetBrains Mono"'; px.fillStyle='#6b6d72'; px.fillText('HALFTONE AUDIO · DIRECT DRIVE · 33/45',8,96);
+  const plate=new THREE.Mesh(new THREE.PlaneGeometry(0.9,0.2),new THREE.MeshBasicMaterial({map:tex(pc),transparent:true,toneMapped:false})); plate.position.set(0.32,-1.12,0.1505); g.add(plate);
+  shadowAll(g);
+  return {root:g, arm, led};
+}
 function buildPlayer(){
   const g=new THREE.Group();
   const alu=new THREE.MeshPhysicalMaterial({color:0xd6d8db,metalness:.55,roughness:.3,clearcoat:.5,clearcoatRoughness:.25});
@@ -499,6 +575,10 @@ function replaceItem(i){
   scene.remove(old.outer); disposeObj(old.outer); items[i]=nu;
 }
 const player=buildPlayer(); scene.add(player.root); player.root.position.set(0,-7,0);
+player.phones=addHeadphones(player.root,-1.1);
+const turntable=buildTurntable(); scene.add(turntable.root); turntable.root.position.set(0,-7,0);
+turntable.phones=addHeadphones(turntable.root,-1.35);
+const tmpV=new THREE.Vector3();
 
 /* ---------------- your music: import, tags, cover art, saving ---------------- */
 const AUDIO_RE=/\.(mp3|m4a|aac|flac|ogg|oga|opus|wav|webm)$/i, IMG_RE=/\.(jpe?g|png|webp)$/i;
@@ -587,7 +667,7 @@ ldTarget=45;
 let cur=0, target=0, mode='shelf', playIdx=-1;
 let wide=true, stageX=0;
 const $=id=>document.getElementById(id);
-const ICONS={plus:'<path d="M12 5v14M5 12h14"/>',list:'<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',left:'<path d="m15 18-6-6 6-6"/>',right:'<path d="m9 18 6-6-6-6"/>',back:'<path d="M19 12H5M12 19l-7-7 7-7"/>',
+const ICONS={plus:'<path d="M12 5v14M5 12h14"/>',pile:'<path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/>',list:'<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',left:'<path d="m15 18-6-6 6-6"/>',right:'<path d="m9 18 6-6-6-6"/>',back:'<path d="M19 12H5M12 19l-7-7 7-7"/>',
  prev:'<path d="M19 20 9 12l10-8z"/><path d="M5 19V5"/>',next:'<path d="m5 4 10 8-10 8z"/><path d="M19 5v14"/>',play:'<path d="M7 4.5v15l12-7.5z"/>',pause:'<path d="M8 5v14M16 5v14"/>',
  vol:'<path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>',mute:'<path d="M11 5 6 9H3v6h3l5 4z"/><path d="m22 9-6 6M16 9l6 6"/>'};
 const icon=n=>`<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>`;
@@ -775,6 +855,18 @@ if('mediaSession' in navigator){ const ms=navigator.mediaSession; const h=(a,f)=
   h('seekto',d=>seekTo(d.seekTime)); h('seekforward',()=>seekTo(elapsed+10)); h('seekbackward',()=>seekTo(elapsed-10)); }
 $('back').onclick=()=>leave();
 
+function enterCollage(){
+  if(mode==='stage') leave(); mode='collage'; document.body.classList.add('collage-mode');
+  $('pileBtn').classList.add('on'); $('pileBtn').setAttribute('aria-pressed','true'); hideCursor(); layoutBand();
+}
+function exitCollage(i){
+  if(mode!=='collage') return; mode='shelf'; target=THREE.MathUtils.clamp(i,0,N-1);
+  document.body.classList.remove('collage-mode'); $('pileBtn').classList.remove('on'); $('pileBtn').setAttribute('aria-pressed','false'); layoutBand();
+}
+let introDone=false;
+$('pileBtn').onclick=()=>{ introDone=true; mode==='collage' ? exitCollage(Math.round(cur)) : enterCollage(); };
+function pilePose(i){ const r=rng(i*7919+3), c=(N-1)/2, sp=Math.min(0.4,2.2/Math.max(1,N-1));
+  return {x:(i-c)*sp+(r()-.5)*0.35, y:(r()-.5)*0.8+Math.sin(i*1.7)*0.2, z:i*0.07-N*0.035, rx:(r()-.5)*0.3, ry:(r()-.5)*0.7, rz:(r()-.5)*0.9}; }
 function enter(i){
   if(mode!=='shelf') return; mode='stage'; playIdx=i; track=0; elapsed=0;
   document.body.classList.add('playing-mode'); renderTracks(); hideCursor();
@@ -813,6 +905,7 @@ function screenOf(it){ const v=new THREE.Vector3(); it.outer.getWorldPosition(v)
 function hideCursor(){ curEl.classList.remove('show'); }
 let down=null;
 canvas.addEventListener('pointerdown',e=>{
+  if(mode==='collage'){ introDone=true; const h=pick(e.clientX,e.clientY); if(h>=0) exitCollage(h); return; }
   if(mode!=='shelf') return; canvas.setPointerCapture(e.pointerId);
   const hit=pick(e.clientX,e.clientY); const act=Math.round(cur);
   down={x:e.clientX,y:e.clientY,lx:e.clientX,ly:e.clientY,hit,moved:0,startTarget:target,mode:(hit===act?'spin':'scroll')};
@@ -830,10 +923,10 @@ canvas.addEventListener('pointermove',e=>{
       else { it.spinAngle+=dx*0.012; it.spinVel=dx*0.012; } }
     return;
   }
-  if(mode!=='shelf'){ hideCursor(); return; }
+  if(mode==='stage'){ hideCursor(); return; }
   const h=pick(e.clientX,e.clientY);
   if(h<0){ hideCursor(); return; }
-  curEl.textContent = h===Math.round(cur) ? 'Click to play, drag to spin' : 'View';
+  curEl.textContent = mode==='collage' ? 'Open' : h===Math.round(cur) ? 'Click to play, drag to spin' : 'View';
   curEl.classList.add('show');
 });
 function endDown(e){
@@ -846,11 +939,11 @@ function endDown(e){
 canvas.addEventListener('pointerup',endDown); canvas.addEventListener('pointercancel',endDown);
 canvas.addEventListener('pointerleave',()=>{ if(!down) hideCursor(); });
 let snapT;
-addEventListener('wheel',e=>{ if(mode!=='shelf') return; e.preventDefault();
+addEventListener('wheel',e=>{ if(mode==='collage'){ introDone=true; exitCollage(Math.round(cur)); } if(mode!=='shelf') return; e.preventDefault();
   const d=Math.abs(e.deltaY)>Math.abs(e.deltaX)?e.deltaY:e.deltaX;
   target=THREE.MathUtils.clamp(target+d*0.0028,0,N-1); clearTimeout(snapT); snapT=setTimeout(()=>target=Math.round(target),160); },{passive:false});
 addEventListener('keydown',e=>{
-  if(e.key==='Escape') return leave();
+  if(e.key==='Escape'){ if(mode==='collage') return exitCollage(Math.round(cur)); return leave(); }
   if(mode==='shelf'){ if(e.key==='ArrowRight') go(Math.round(target)+1); if(e.key==='ArrowLeft') go(Math.round(target)-1); if(e.key==='Enter' && e.target===document.body) enter(Math.round(cur)); }
   else { if(e.key===' '){ e.preventDefault(); setPlaying(!playing); } if(e.key==='ArrowRight') setTrack(track+1); if(e.key==='ArrowLeft') setTrack(track-1); }
 });
@@ -868,6 +961,15 @@ function tick(){
   const PS = wide?1:0.82;
   const playerPos=new THREE.Vector3(stageX, playerShown?-0.05:-7, 0);
   lerpPose(player.root,playerPos,{x:-0.04,y:wide?0.12:0,z:0},PS,Math.min(1,dt*4.5));
+  const ttShown = mode==='stage' && ALBUMS[playIdx].kind==='vinyl';
+  const TS = wide?0.95:0.8;
+  lerpPose(turntable.root,new THREE.Vector3(stageX, ttShown?-0.05:-7, 0),{x:-0.04,y:wide?0.12:0,z:0},TS,Math.min(1,dt*4.5));
+  turntable.root.updateMatrixWorld();
+  player.phones.visible=wide; turntable.phones.visible=wide;
+  const prog = ttShown ? Math.min(1, elapsed/(trackLen()||1)) : 0;
+  const armT = (ttShown && playing) ? -0.40 - 0.12*prog : 0;
+  turntable.arm.rotation.z += (armT-turntable.arm.rotation.z)*Math.min(1,dt*2.2);
+  turntable.led.material.emissiveIntensity = (ttShown && playing) ? 2 : 0;
 
   items.forEach((it,i)=>{
     const d=i-cur, ad=Math.abs(d), sg=Math.sign(d);
@@ -877,14 +979,19 @@ function tick(){
         p.set(stageX, -0.05+0.38*PS, 0.19*PS+0.02); s=1.13*PS; r.x=-0.04; r.y=wide?0.12:0;
         // follow the player as it rises
         p.y = player.root.position.y + 0.38*PS; p.x=player.root.position.x;
-      } else { p.set(stageX,0.12,1.4); s=(it.a.kind==='tape'?1.45:1.25)*(wide?1:0.86); r.x=-0.08; r.y=wide?0.18:0; }
+      } else if(it.a.kind==='vinyl'){
+        // the record sits on the platter, under the tonearm
+        tmpV.set(TT_PX,TT_PY,0.245); turntable.root.localToWorld(tmpV); p.copy(tmpV); s=1.24*TS; r.x=-0.04; r.y=wide?0.12:0;
+      } else { p.set(stageX,0.12,1.4); s=1.45*(wide?1:0.86); r.x=-0.08; r.y=wide?0.18:0; }
+    } else if(mode==='collage'){
+      const pp=pilePose(i); p.set(pp.x,pp.y,pp.z); r.x=pp.rx; r.y=pp.ry; r.z=pp.rz; s=0.95;
     } else {
       const x = sg*(Math.min(ad,1)*2.45 + Math.max(ad-1,0)*2.05);
       p.set(x, (mode==='stage'?-10:0), -Math.min(ad,2.2)*0.95);
       r.y = -THREE.MathUtils.clamp(d,-1.6,1.6)*0.5; r.x = -0.06; r.z = THREE.MathUtils.clamp(d,-1,1)*0.04;
       s = 1.18 - Math.min(ad,1)*0.38;
     }
-    lerpPose(it.outer,p,r,s,(mode==='stage'&&i===playIdx&&it.a.kind==='cd')?Math.min(1,dt*5):k);
+    lerpPose(it.outer,p,r,s,(mode==='stage'&&i===playIdx&&it.a.kind!=='tape')?Math.min(1,dt*5):k);
 
     // spinning
     const isPlaying = mode==='stage' && i===playIdx && playing;
@@ -902,15 +1009,19 @@ function tick(){
       if(!dragging && Math.abs(it.spinVel)<0.01){ const tgt=Math.round(it.spinAngle/(Math.PI*2))*Math.PI*2; it.spinAngle+=(tgt-it.spinAngle)*Math.min(1,dt*4); }
       it.spinObj.rotation.y = it.spinAngle;
       if(it.reels){ const sp = isPlaying?4*dt:0; it.reels.forEach(rl=>rl.rotation.z-=sp); }
+      if(it.packs && mode==='stage' && i===playIdx){ const f=Math.min(1,elapsed/(trackLen()||1)); it.packs[0].scale.setScalar(1-0.4*f); it.packs[1].scale.setScalar(0.6+0.4*f); }
     }
     if(it.a.kind==='vinyl'){
       const out = mode==='stage' && i===playIdx;
-      const hover = mode==='shelf' && ad<.5;
-      it.rec.position.x += ((out?0.62:hover?0.42:0.3)-it.rec.position.x)*k;
-      it.rec.position.z += ((out?0.12:-0.03)-it.rec.position.z)*k;
+      const hover = (mode==='shelf' && ad<.5) || mode==='collage';
+      // on the turntable the record is centred and the sleeve leans behind the deck
+      it.rec.position.x += ((out?0:hover?0.42:0.3)-it.rec.position.x)*k;
+      it.rec.position.z += ((out?0:-0.03)-it.rec.position.z)*k;
       it.sleeve.position.x += ((out?-0.62:0)-it.sleeve.position.x)*k;
-      it.sleeve.position.z += ((out?-0.2:0)-it.sleeve.position.z)*k;
-      it.sleeve.rotation.y += ((out?0.35:0)-it.sleeve.rotation.y)*k;
+      it.sleeve.position.y += ((out?0.66:0)-it.sleeve.position.y)*k;
+      it.sleeve.position.z += ((out?-0.36:0)-it.sleeve.position.z)*k;
+      it.sleeve.rotation.y += (0-it.sleeve.rotation.y)*k;
+      it.sleeve.rotation.z += ((out?0.1:0)-it.sleeve.rotation.z)*k;
     }
   });
 
@@ -929,6 +1040,9 @@ const mine=await loadLibrary().catch(()=>null);
 await buildShelf(mine||DEMO, true);
 if(mine){ $('clearBtn').hidden=false; }
 ldTarget=100;
+enterCollage();
+// hold the collage for a moment after the loading screen fades, then spread onto the shelf
+(function waitIntro(){ if(!document.getElementById('loader').classList.contains('done')) return setTimeout(waitIntro,100); setTimeout(()=>{ if(!introDone) exitCollage(0); },2200); })();
 tick();
 </script>
 
