@@ -113,7 +113,6 @@ body.playing-mode .now{opacity:1;transform:translate(-50%,0);pointer-events:auto
 .pick{position:relative;overflow:hidden;display:inline-flex;gap:8px;align-items:center}
 .pick input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:100px}
 .pick:focus-within{outline:2px solid var(--accent);outline-offset:2px}
-@media (pointer:coarse){ .pick.folder{display:none} }
 .bar4 .main{background:var(--pill);color:var(--pill-ink);padding-left:8px}
 .bar4 .main:hover{background:var(--pill);color:var(--pill-ink);opacity:.88}
 .fmtsw{display:flex;gap:4px;width:max-content;border-radius:var(--r-ctl);padding:4px}
@@ -550,7 +549,8 @@ async function importFiles(list){
   await buildShelf(existing.slice());
   const withArt=existing.filter(a=>a.cover).length;
   const saved=await saveLibrary();
-  toast(`${existing.length} album${existing.length===1?'':'s'} on your shelf · ${withArt} with cover art${saved?'':' · not saved, this browser has no room'}`,4500);
+  const tip = (files.length===1 && matchMedia('(pointer:coarse)').matches) ? ' · Tip: long-press a song in the picker, then tap the others to add many at once' : '';
+  toast(`${existing.length} album${existing.length===1?'':'s'} on your shelf · ${withArt} with cover art${saved?'':' · not saved, this browser has no room'}${tip}`, tip?8000:4500);
   $('clearBtn').hidden=false;
 }
 
