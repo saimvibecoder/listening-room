@@ -852,7 +852,10 @@ function tick(){
     if(!dragging){ it.spinVel*=Math.pow(0.06,dt); it.spinAngle+=it.spinVel*dt*60; }
     if(it.spinAxis==='z'){
       const idle = (mode==='shelf' && ad<.5) ? 0.15*dt : 0;
-      const play = isPlaying ? (it.a.kind==='cd'?14:3.5)*dt : 0;
+      // vinyl turns slowly so the label stays readable; speed eases in and out like a real platter
+      const want = isPlaying ? (it.a.kind==='cd'?9:1.1) : 0;
+      it.playSpeed = (it.playSpeed||0) + (want-(it.playSpeed||0))*Math.min(1,dt*(want?1.2:2.2));
+      const play = it.playSpeed*dt;
       it.spinAngle -= idle + play;
       it.spinObj.rotation.z = it.spinAngle;
     } else {
