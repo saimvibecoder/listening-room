@@ -79,6 +79,7 @@ h1.pix{margin:0;font-family:var(--f-pix);font-weight:700;font-size:clamp(36px,5.
 .trk:hover{background:var(--line)}
 .trk .n,.trk .d{font:500 11px var(--f-mono);color:var(--muted);font-variant-numeric:tabular-nums}
 .trk.on{color:var(--ink);font-weight:500} .trk.on .n{color:var(--accent)}
+.trk.upnext{grid-template-columns:1fr auto;border-top:1px solid var(--line);border-radius:0 0 8px 8px;padding-top:12px;color:var(--ink-2)}
 .liner{color:var(--muted);font-size:12px;line-height:1.5;margin:0}
 
 .now{position:absolute;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,24px);width:min(560px,calc(100vw - 32px));border-radius:var(--r-panel);padding:8px 12px 8px 8px;display:grid;grid-template-columns:auto auto 1fr auto;gap:12px;align-items:center;opacity:0;pointer-events:none;transition:opacity .45s .2s var(--ease),transform .45s .2s var(--ease)}
@@ -195,6 +196,7 @@ h1.pix{line-height:.94}
     <div class="mono fm" id="tFmt">Side A</div>
     <h2 id="tTitle">—</h2>
     <ol id="tList"></ol>
+    <button class="trk upnext" id="tNext" hidden></button>
     <p class="liner" id="tLiner"></p>
   </aside>
 
@@ -555,6 +557,7 @@ async function importFiles(list){
     if(same){ const have=new Set(same.tracks.map(t=>t[0])); g.tracks.forEach(t=>{ if(!have.has(t[0])) same.tracks.push(t); }); if(!same.cover&&g.coverBlob){ same.coverBlob=g.coverBlob; same.cover=await blobToBitmap(g.coverBlob); } decorate(same); }
     else { g.kind=kinds[(existing.length)%3]; g.cover=g.coverBlob?await blobToBitmap(g.coverBlob):null; existing.push(decorate(g)); }
   }
+  if(mode!=='shelf') leave();
   toast('Putting it on the shelf…');
   await buildShelf(existing.slice());
   const withArt=existing.filter(a=>a.cover).length;
@@ -721,6 +724,9 @@ function renderTracks(){
     b.append(sn,st,sd); b.onclick=()=>{ setTrack(k); closeTracks(); }; li.appendChild(b); ol.appendChild(li); });
   $('pTitle').textContent=`${a.tracks[track][0]} — ${a.artist}`; $('pThumb').style.backgroundImage=`url(${items[playIdx].thumb})`;
   try{ if('mediaSession' in navigator && window.MediaMetadata) navigator.mediaSession.metadata=new MediaMetadata({title:a.tracks[track][0],artist:a.artist,album:a.title,artwork:[{src:items[playIdx].thumb,sizes:'96x96',type:'image/jpeg'}]}); }catch(e){}
+  const tn=$('tNext'); tn.hidden=N<2;
+  if(N>1){ const nx=ALBUMS[(playIdx+1)%N]; tn.innerHTML=''; const l=document.createElement('span'); l.textContent='Up next: '+nx.title;
+    const r=document.createElement('span'); r.className='d'; r.textContent=FMT[nx.kind]; tn.append(l,r); tn.onclick=()=>{ switchAlbum(playIdx+1,'first'); closeTracks(); }; }
 }
 // real audio for your own files; the demo albums use the little synth
 const media=new Audio(); media.preload='auto'; let mediaURL=null, mediaKey=null;
@@ -732,7 +738,17 @@ function loadTrack(){
 }
 function trackLen(){ const a=ALBUMS[playIdx]; return a.user ? (isFinite(media.duration)&&media.duration ? media.duration : a.tracks[track][1]||0) : a.tracks[track][1]; }
 function stopMedia(){ media.pause(); }
-function setTrack(k){ const a=ALBUMS[playIdx]; track=(k+a.tracks.length)%a.tracks.length; elapsed=0; renderTracks();
+// moving past the first or last track continues into the neighbouring album, like a playlist
+function switchAlbum(ni, where){
+  ni=(ni+N)%N; playIdx=ni; target=ni; const a=ALBUMS[ni];
+  track = where==='last' ? a.tracks.length-1 : 0; elapsed=0;
+  audio.stop(); stopMedia(); mediaKey=null; renderTracks();
+  if(a.user){ loadTrack(); media.currentTime=0; if(playing) media.play().catch(()=>{}); }
+  else if(playing) audio.start(a,track);
+}
+function setTrack(k){ const a=ALBUMS[playIdx];
+  if(N>1 && (k>=a.tracks.length || k<0)) return switchAlbum(playIdx+(k<0?-1:1), k<0?'last':'first');
+  track=(k+a.tracks.length)%a.tracks.length; elapsed=0; renderTracks();
   if(a.user){ loadTrack(); media.currentTime=0; if(playing) media.play().catch(()=>{}); } else if(playing) audio.start(a,track); }
 function setPlaying(p){ playing=p; $('pPlay').innerHTML=icon(p?'pause':'play'); $('pPlay').setAttribute('aria-label',p?'Pause':'Play');
   const a=ALBUMS[playIdx]; if(!a) return;
