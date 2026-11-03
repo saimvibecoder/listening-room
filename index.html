@@ -865,8 +865,19 @@ function exitCollage(i){
 }
 let introDone=false;
 $('pileBtn').onclick=()=>{ introDone=true; mode==='collage' ? exitCollage(Math.round(cur)) : enterCollage(); };
-function pilePose(i){ const r=rng(i*7919+3), c=(N-1)/2, sp=Math.min(0.4,2.2/Math.max(1,N-1));
-  return {x:(i-c)*sp+(r()-.5)*0.35, y:(r()-.5)*0.8+Math.sin(i*1.7)*0.2, z:i*0.07-N*0.035, rx:(r()-.5)*0.3, ry:(r()-.5)*0.7, rz:(r()-.5)*0.9}; }
+function pilePose(i){
+  // fit the collage to what the camera can see right now
+  const tan=Math.tan(THREE.MathUtils.degToRad(15)), H=2*camPos.z*tan, W=H*camera.aspect, r=rng(i*7919+3);
+  if(N>12){ // big collections: a neat wall of covers, every album reachable with one tap
+    const aw=W*0.92, ah=H*(wide?0.64:0.58), cols=Math.max(1,Math.round(Math.sqrt(N*aw/ah))), rows=Math.ceil(N/cols);
+    const cell=Math.min(aw/cols, ah/rows), col=i%cols, row=Math.floor(i/cols);
+    const inRow=row===rows-1 ? N-cols*(rows-1) : cols;
+    return {x:(col-(inRow-1)/2)*cell, y:((rows-1)/2-row)*cell + H*0.02, z:0, rx:0, ry:0, rz:(r()-.5)*0.1, s:cell/2.05};
+  }
+  const c=(N-1)/2, fitW=Math.min(W*0.82,6.5), sp=N>1?Math.max(0,Math.min(0.4,(fitW-1.9)/(N-1))):0;
+  const s=0.95*Math.min(1, fitW/(1.9+(N-1)*sp+0.3));
+  return {x:((i-c)*sp+(r()-.5)*0.3)*s/0.95, y:(r()-.5)*0.7+Math.sin(i*1.7)*0.2, z:i*0.07-N*0.035, rx:(r()-.5)*0.3, ry:(r()-.5)*0.7, rz:(r()-.5)*0.9, s};
+}
 function enter(i){
   if(mode!=='shelf') return; mode='stage'; playIdx=i; track=0; elapsed=0;
   document.body.classList.add('playing-mode'); renderTracks(); hideCursor();
@@ -966,6 +977,8 @@ function tick(){
   lerpPose(turntable.root,new THREE.Vector3(stageX, ttShown?-0.05:-7, 0),{x:-0.04,y:wide?0.12:0,z:0},TS,Math.min(1,dt*4.5));
   turntable.root.updateMatrixWorld();
   player.phones.visible=wide; turntable.phones.visible=wide;
+  // floor shadows fade out behind the cover wall so it stays clean
+  ground.material.opacity += (((mode==='collage'&&N>12)?0:0.13)-ground.material.opacity)*Math.min(1,dt*4);
   const prog = ttShown ? Math.min(1, elapsed/(trackLen()||1)) : 0;
   const armT = (ttShown && playing) ? -0.40 - 0.12*prog : 0;
   turntable.arm.rotation.z += (armT-turntable.arm.rotation.z)*Math.min(1,dt*2.2);
@@ -984,7 +997,7 @@ function tick(){
         tmpV.set(TT_PX,TT_PY,0.245); turntable.root.localToWorld(tmpV); p.copy(tmpV); s=1.24*TS; r.x=-0.04; r.y=wide?0.12:0;
       } else { p.set(stageX,0.12,1.4); s=1.45*(wide?1:0.86); r.x=-0.08; r.y=wide?0.18:0; }
     } else if(mode==='collage'){
-      const pp=pilePose(i); p.set(pp.x,pp.y,pp.z); r.x=pp.rx; r.y=pp.ry; r.z=pp.rz; s=0.95;
+      const pp=pilePose(i); p.set(pp.x,pp.y,pp.z); r.x=pp.rx; r.y=pp.ry; r.z=pp.rz; s=pp.s;
     } else {
       const x = sg*(Math.min(ad,1)*2.45 + Math.max(ad-1,0)*2.05);
       p.set(x, (mode==='stage'?-10:0), -Math.min(ad,2.2)*0.95);
@@ -1013,7 +1026,7 @@ function tick(){
     }
     if(it.a.kind==='vinyl'){
       const out = mode==='stage' && i===playIdx;
-      const hover = (mode==='shelf' && ad<.5) || mode==='collage';
+      const hover = (mode==='shelf' && ad<.5) || (mode==='collage' && N<=12);
       // on the turntable the record is centred and the sleeve leans behind the deck
       it.rec.position.x += ((out?0:hover?0.42:0.3)-it.rec.position.x)*k;
       it.rec.position.z += ((out?0:-0.03)-it.rec.position.z)*k;
