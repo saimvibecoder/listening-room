@@ -10,7 +10,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Doto:wght@700&family=JetBrains+Mono:wght@400;500;700&family=Caveat:wght@600&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Doto:wght@700&family=Archivo:wdth,wght@75,600&family=JetBrains+Mono:wght@400;500;700&family=Caveat:wght@600&family=Inter:wght@400;500;600&display=swap">
 <style>
 /* Single light look by design (a lit studio counter), same in every theme.
    Layout: full-bleed WebGL shelf on a dot-grid counter; HUD pinned to corners (title top-left, counter top-right, dock bottom). 4px grid. */
@@ -19,7 +19,7 @@
   --surface:#f6f6f3; --pill:#151514; --pill-ink:#f4f4f1; --accent:#d2342b; --lcd:#0f110f;
   --r-ctl:10px; --r-panel:14px; color-scheme:light;
   --ease:cubic-bezier(.2,.7,.2,1);
-  --f-pix:"Doto","VT323","Courier New",monospace;
+  --f-pix:"Archivo","Arial Narrow",system-ui,sans-serif;
   --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
   --f-body:"Inter",system-ui,-apple-system,sans-serif;
 }
@@ -88,7 +88,8 @@ h1.pix{margin:0;font-family:var(--f-pix);font-weight:700;font-size:clamp(36px,5.
 .thumb{width:36px;height:36px;border-radius:6px;background:var(--line) center/cover}
 .meta{min-width:0;display:grid;gap:8px}
 .meta .t{font-weight:500;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.prog{height:4px;border-radius:2px;background:var(--line);overflow:hidden;cursor:pointer}
+.prog{padding:10px 0;margin:-10px 0;cursor:pointer;touch-action:none}
+.prog b{display:block;height:4px;border-radius:2px;background:var(--line);overflow:hidden}
 .prog i{display:block;height:100%;width:0;background:var(--ink)}
 .time{font:500 11px var(--f-mono);color:var(--muted);font-variant-numeric:tabular-nums;min-width:32px;text-align:right}
 
@@ -125,8 +126,17 @@ body.playing-mode .now{opacity:1;transform:translate(-50%,0);pointer-events:auto
 .drop span{color:var(--muted)}
 .toast{position:fixed;left:50%;top:calc(24px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:16;background:var(--pill);color:var(--pill-ink);border-radius:var(--r-ctl);padding:8px 16px;max-width:calc(100vw - 32px);text-align:center}
 
+/* display type: clean condensed caps (the dot-matrix face stays on the player's LCD only) */
+h1.pix,.counter b,.tracks h2,.ld b,.drop b{font-weight:600;font-stretch:75%;letter-spacing:0}
+h1.pix{line-height:.94}
+.ib.list{display:none}
+.ib.list.on{background:var(--line);color:var(--ink)}
+
 @media (max-width:760px){
-  .tracks{display:none}
+  .tracks{left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));width:auto;top:auto;bottom:calc(92px + env(safe-area-inset-bottom,0px));transform:translateY(12px);max-height:min(55vh,420px);overflow:auto;transition-delay:0s}
+  body.playing-mode .tracks{opacity:0;transform:translateY(12px);pointer-events:none}
+  body.playing-mode.tracks-open .tracks{opacity:1;transform:none;pointer-events:auto}
+  .ib.list{display:grid}
   .hint{display:none}
   .info{max-width:calc(100vw - 120px);gap:12px}
   .counter .sfx{display:none}
@@ -195,8 +205,8 @@ body.playing-mode .now{opacity:1;transform:translate(-50%,0);pointer-events:auto
       <button class="ib" id="pNext" aria-label="Next track"><span data-i="next"></span></button>
     </div>
     <div class="thumb" id="pThumb"></div>
-    <div class="meta"><div class="t" id="pTitle">—</div><div class="prog" id="pProg"><i id="pBar"></i></div></div>
-    <div class="ctrls"><span class="time" id="pTime">0:00</span><button class="ib" id="pMute" aria-label="Mute"></button></div>
+    <div class="meta"><div class="t" id="pTitle">—</div><div class="prog" id="pProg" role="slider" aria-label="Seek" tabindex="0"><b><i id="pBar"></i></b></div></div>
+    <div class="ctrls"><span class="time" id="pTime">0:00</span><button class="ib list" id="pList" aria-label="Tracklist"><span data-i="list"></span></button><button class="ib" id="pMute" aria-label="Mute"></button></div>
   </div>
 </div>
 
@@ -253,7 +263,7 @@ let ldShown = 0, ldTarget = 0;
 ldTarget = 15;
 
 await Promise.race([
-  Promise.all(['700 40px Doto','600 40px Caveat','500 20px "JetBrains Mono"','700 20px "JetBrains Mono"'].map(f=>document.fonts.load(f))),
+  Promise.all(['700 40px Doto','600 40px Archivo','600 40px Caveat','500 20px "JetBrains Mono"','700 20px "JetBrains Mono"'].map(f=>document.fonts.load(f))),
   new Promise(r=>setTimeout(r,2500))
 ]);
 ldTarget = 40;
@@ -574,7 +584,7 @@ ldTarget=45;
 let cur=0, target=0, mode='shelf', playIdx=-1;
 let wide=true, stageX=0;
 const $=id=>document.getElementById(id);
-const ICONS={plus:'<path d="M12 5v14M5 12h14"/>',left:'<path d="m15 18-6-6 6-6"/>',right:'<path d="m9 18 6-6-6-6"/>',back:'<path d="M19 12H5M12 19l-7-7 7-7"/>',
+const ICONS={plus:'<path d="M12 5v14M5 12h14"/>',list:'<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',left:'<path d="m15 18-6-6 6-6"/>',right:'<path d="m9 18 6-6-6-6"/>',back:'<path d="M19 12H5M12 19l-7-7 7-7"/>',
  prev:'<path d="M19 20 9 12l10-8z"/><path d="M5 19V5"/>',next:'<path d="m5 4 10 8-10 8z"/><path d="M19 5v14"/>',play:'<path d="M7 4.5v15l12-7.5z"/>',pause:'<path d="M8 5v14M16 5v14"/>',
  vol:'<path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>',mute:'<path d="M11 5 6 9H3v6h3l5 4z"/><path d="m22 9-6 6M16 9l6 6"/>'};
 const icon=n=>`<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>`;
@@ -708,8 +718,9 @@ function renderTracks(){
     const sn=document.createElement('span'); sn.className='n'; sn.textContent=String(k+1).padStart(2,'0');
     const st=document.createElement('span'); st.textContent=n;
     const sd=document.createElement('span'); sd.className='d'; sd.textContent=d?fmtTime(d):'—';
-    b.append(sn,st,sd); b.onclick=()=>setTrack(k); li.appendChild(b); ol.appendChild(li); });
+    b.append(sn,st,sd); b.onclick=()=>{ setTrack(k); closeTracks(); }; li.appendChild(b); ol.appendChild(li); });
   $('pTitle').textContent=`${a.tracks[track][0]} — ${a.artist}`; $('pThumb').style.backgroundImage=`url(${items[playIdx].thumb})`;
+  try{ if('mediaSession' in navigator && window.MediaMetadata) navigator.mediaSession.metadata=new MediaMetadata({title:a.tracks[track][0],artist:a.artist,album:a.title,artwork:[{src:items[playIdx].thumb,sizes:'96x96',type:'image/jpeg'}]}); }catch(e){}
 }
 // real audio for your own files; the demo albums use the little synth
 const media=new Audio(); media.preload='auto'; let mediaURL=null, mediaKey=null;
@@ -731,8 +742,21 @@ $('pPlay').onclick=()=>setPlaying(!playing);
 $('pPrev').onclick=()=>setTrack(elapsed>3?track:track-1);
 $('pNext').onclick=()=>setTrack(track+1);
 $('pMute').onclick=()=>{ audio.setMute(!audio.muted); media.muted=audio.muted; $('pMute').innerHTML=icon(audio.muted?'mute':'vol'); $('pMute').setAttribute('aria-label',audio.muted?'Unmute':'Mute'); };
-$('pProg').onclick=e=>{ const r=e.currentTarget.getBoundingClientRect(); const f=(e.clientX-r.left)/r.width; const L=trackLen();
-  if(ALBUMS[playIdx].user){ if(L) media.currentTime=f*L; } else elapsed=f*L; };
+// seek: tap or drag anywhere along the bar
+function seekTo(sec){ const L=trackLen(); if(!L) return; sec=Math.max(0,Math.min(L-0.25,sec)); if(ALBUMS[playIdx].user) media.currentTime=sec; else elapsed=sec; }
+function seekAt(x){ const r=$('pProg').getBoundingClientRect(); seekTo((x-r.left)/r.width*trackLen()); }
+let scrubbing=false;
+$('pProg').addEventListener('pointerdown',e=>{ scrubbing=true; e.currentTarget.setPointerCapture(e.pointerId); seekAt(e.clientX); });
+$('pProg').addEventListener('pointermove',e=>{ if(scrubbing) seekAt(e.clientX); });
+['pointerup','pointercancel'].forEach(t=>$('pProg').addEventListener(t,()=>scrubbing=false));
+$('pProg').addEventListener('keydown',e=>{ if(e.key==='ArrowRight'){ seekTo(elapsed+10); e.stopPropagation(); } if(e.key==='ArrowLeft'){ seekTo(elapsed-10); e.stopPropagation(); } });
+// tracklist sheet on phones
+$('pList').onclick=()=>{ const o=document.body.classList.toggle('tracks-open'); $('pList').classList.toggle('on',o); };
+function closeTracks(){ document.body.classList.remove('tracks-open'); $('pList').classList.remove('on'); }
+// lock-screen and headphone controls
+if('mediaSession' in navigator){ const ms=navigator.mediaSession; const h=(a,f)=>{ try{ ms.setActionHandler(a,f); }catch(e){} };
+  h('play',()=>setPlaying(true)); h('pause',()=>setPlaying(false)); h('previoustrack',()=>setTrack(track-1)); h('nexttrack',()=>setTrack(track+1));
+  h('seekto',d=>seekTo(d.seekTime)); h('seekforward',()=>seekTo(elapsed+10)); h('seekbackward',()=>seekTo(elapsed-10)); }
 $('back').onclick=()=>leave();
 
 function enter(i){
@@ -742,7 +766,7 @@ function enter(i){
 }
 function leave(){
   if(mode!=='stage') return; setPlaying(false); mode='shelf'; audio.stop(); stopMedia();
-  document.body.classList.remove('playing-mode'); playIdx=-1; setTimeout(layoutBand,520);
+  document.body.classList.remove('playing-mode'); closeTracks(); playIdx=-1; setTimeout(layoutBand,520);
 }
 
 /* ---------------- LCD ---------------- */
